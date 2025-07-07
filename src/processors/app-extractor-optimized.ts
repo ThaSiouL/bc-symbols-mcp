@@ -1,5 +1,5 @@
 import AdmZip from 'adm-zip';
-import { createHash } from 'crypto';
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'fs';
 import { BCApp } from '../types/bc-types.js';
 import { LazyMemoryCache } from '../cache/lazy-cache.js';
