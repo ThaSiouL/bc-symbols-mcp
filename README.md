@@ -11,38 +11,67 @@ A Model Context Protocol (MCP) server for analyzing Business Central .app files 
 - **Caching**: In-memory caching with file hash-based invalidation
 - **Cross-App Analysis**: Analyze relationships and dependencies across multiple loaded apps
 
-## Installation
+## Quick Installation
+
+### Using Claude MCP Add (Recommended)
+
+```bash
+# Install directly from npm
+claude mcp add bc-symbols-mcp
+```
+
+### Using npm
+
+```bash
+# Install globally
+npm install -g bc-symbols-mcp
+
+# Or install locally in your project
+npm install bc-symbols-mcp
+```
+
+### From Source
 
 ```bash
 # Clone the repository
-git clone <repository-url>
+git clone https://github.com/ThaSiouL/bc-symbols-mcp.git
 cd bc-symbols-mcp
 
-# Install dependencies
+# Install dependencies and build
 npm install
-
-# Build the project
 npm run build
 ```
 
 ## Usage
 
-### As an MCP Server
-
-The server implements the Model Context Protocol and can be used with any MCP-compatible client (like Claude Desktop).
-
-```bash
-# Start the server
-npm start
-
-# Or run in development mode
-npm run dev
-```
-
 ### Configuration for Claude Desktop
 
-Add the following to your Claude Desktop configuration:
+Add the following to your Claude Desktop configuration file:
 
+#### Option 1: Using npm global installation
+```json
+{
+  "mcpServers": {
+    "bc-symbols": {
+      "command": "bc-symbols-mcp"
+    }
+  }
+}
+```
+
+#### Option 2: Using npx (no installation required)
+```json
+{
+  "mcpServers": {
+    "bc-symbols": {
+      "command": "npx",
+      "args": ["bc-symbols-mcp"]
+    }
+  }
+}
+```
+
+#### Option 3: From source
 ```json
 {
   "mcpServers": {
