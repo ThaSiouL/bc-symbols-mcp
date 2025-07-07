@@ -165,7 +165,7 @@ export class BCResources {
     const resourceType = url.pathname.substring(1); // Remove leading slash
 
     switch (resourceType) {
-      case 'all':
+      case 'all': {
         const apps = this.cache.getValidCachedApps();
         return JSON.stringify(apps.map(app => ({
           id: app.id,
@@ -177,6 +177,7 @@ export class BCResources {
           dependencyCount: app.dependencies.length,
           objectCounts: this.getObjectCounts(app)
         })), null, 2);
+      }
 
       case 'cache-stats':
         return JSON.stringify(this.cache.getStats(), null, 2);

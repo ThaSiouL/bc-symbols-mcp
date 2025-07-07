@@ -1,8 +1,23 @@
 import { BCSymbolReference, BCNamespace, BCTable, BCCodeunit, BCPage, BCPageExtension, BCEnumType, BCMethod, BCField, BCParameter, BCVariable, BCTypeDefinition, BCProperty, BCControl, BCAction, BCActionChange } from '../types/bc-types.js';
+import { StreamingSymbolParser } from './streaming-parser.js';
 
 export class SymbolParser {
+  private streamingParser: StreamingSymbolParser;
+
+  constructor() {
+    this.streamingParser = new StreamingSymbolParser();
+  }
+
   /**
-   * Parse the complete symbol reference JSON
+   * Parse symbols using streaming approach for large files
+   */
+  async parseSymbolReferenceStreaming(symbolsBuffer: Buffer): Promise<BCSymbolReference> {
+    const index = await this.streamingParser.parseSymbolsProgressive(symbolsBuffer);
+    return this.streamingParser.createLazySymbolReference();
+  }
+
+  /**
+   * Parse the complete symbol reference JSON (legacy method)
    */
   parseSymbolReference(symbolsData: any): BCSymbolReference {
     if (!symbolsData || !symbolsData.RuntimeVersion) {

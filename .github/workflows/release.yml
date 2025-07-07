@@ -1,0 +1,214 @@
+name: Release
+
+on:
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - 'README.md'
+      - 'docs/**'
+      - '.github/**'
+      - '**/*.md'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '24'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Run tests
+      run: npm test
+
+    - name: Build project
+      run: npm run build
+
+  release:
+    needs: test
+    runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+    
+    permissions:
+      contents: write
+      packages: write
+      issues: write
+      pull-requests: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '24'
+        cache: 'npm'
+        registry-url: 'https://registry.npmjs.org'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Build project
+      run: npm run build
+
+    - name: Configure Git
+      run: |
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+    - name: Determine version bump
+      id: version
+      run: |
+        # Check commit messages for version bump indicators
+        COMMIT_MSG="${{ github.event.head_commit.message }}"
+        
+        if [[ "$COMMIT_MSG" == *"BREAKING CHANGE"* ]] || [[ "$COMMIT_MSG" == *"[major]"* ]]; then
+          echo "bump=major" >> $GITHUB_OUTPUT
+        elif [[ "$COMMIT_MSG" == *"feat"* ]] || [[ "$COMMIT_MSG" == *"[minor]"* ]]; then
+          echo "bump=minor" >> $GITHUB_OUTPUT
+        else
+          echo "bump=patch" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Bump version
+      id: bump
+      run: |
+        CURRENT_VERSION=$(node -p "require('./package.json').version")
+        echo "current-version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+        
+        # Bump version based on commit type
+        NEW_VERSION=$(npm version ${{ steps.version.outputs.bump }} --no-git-tag-version)
+        echo "new-version=${NEW_VERSION#v}" >> $GITHUB_OUTPUT
+        
+        # Update package.json
+        npm version ${{ steps.version.outputs.bump }} --no-git-tag-version
+
+    - name: Generate changelog
+      id: changelog
+      run: |
+        # Create a simple changelog based on commits since last tag
+        LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+        
+        if [ -z "$LAST_TAG" ]; then
+          COMMITS=$(git log --oneline --pretty=format:"- %s (%h)" -n 20)
+        else
+          COMMITS=$(git log ${LAST_TAG}..HEAD --oneline --pretty=format:"- %s (%h)")
+        fi
+        
+        # Create changelog content
+        cat > CHANGELOG_TEMP.md << EOF
+        ## Changes in v${{ steps.bump.outputs.new-version }}
+        
+        $COMMITS
+        
+        **Full Changelog**: https://github.com/${{ github.repository }}/compare/${LAST_TAG}...v${{ steps.bump.outputs.new-version }}
+        EOF
+        
+        echo "changelog-file=CHANGELOG_TEMP.md" >> $GITHUB_OUTPUT
+
+    - name: Commit version bump
+      run: |
+        git add package.json package-lock.json
+        git commit -m "chore: bump version to v${{ steps.bump.outputs.new-version }} [skip ci]"
+        git tag "v${{ steps.bump.outputs.new-version }}"
+
+    - name: Push changes
+      run: |
+        git push origin main
+        git push origin "v${{ steps.bump.outputs.new-version }}"
+
+    - name: Create GitHub Release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: v${{ steps.bump.outputs.new-version }}
+        release_name: Release v${{ steps.bump.outputs.new-version }}
+        body_path: ${{ steps.changelog.outputs.changelog-file }}
+        draft: false
+        prerelease: false
+
+    - name: Publish to NPM
+      if: success()
+      env:
+        NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      run: |
+        # Only publish if we have an NPM token
+        if [ -n "$NODE_AUTH_TOKEN" ]; then
+          npm publish --access public
+          echo "✅ Published to NPM successfully"
+        else
+          echo "⚠️ NPM_TOKEN not found, skipping NPM publish"
+        fi
+
+    - name: Create MCP Installation Instructions
+      if: success()
+      run: |
+        cat > INSTALL_INSTRUCTIONS.md << EOF
+        # BC Symbols MCP v${{ steps.bump.outputs.new-version }} Installation
+        
+        ## NPM Installation
+        \`\`\`bash
+        npm install -g bc-symbols-mcp@${{ steps.bump.outputs.new-version }}
+        \`\`\`
+        
+        ## Direct MCP Installation
+        \`\`\`bash
+        npx @modelcontextprotocol/cli install bc-symbols-mcp
+        \`\`\`
+        
+        ## Usage
+        Add to your MCP client configuration:
+        \`\`\`json
+        {
+          "mcpServers": {
+            "bc-symbols": {
+              "command": "bc-symbols-mcp",
+              "args": []
+            }
+          }
+        }
+        \`\`\`
+        EOF
+
+    - name: Upload installation instructions
+      uses: actions/upload-artifact@v4
+      with:
+        name: installation-instructions-v${{ steps.bump.outputs.new-version }}
+        path: INSTALL_INSTRUCTIONS.md
+        retention-days: 30
+
+  notify:
+    needs: [test, release]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+    - name: Notify on success
+      if: ${{ needs.release.result == 'success' }}
+      run: |
+        echo "🎉 Successfully released new version!"
+        echo "✅ Tests passed"
+        echo "✅ Version bumped and tagged"
+        echo "✅ GitHub release created"
+        echo "✅ NPM package published (if token available)"
+
+    - name: Notify on failure
+      if: ${{ needs.test.result == 'failure' || needs.release.result == 'failure' }}
+      run: |
+        echo "❌ Release failed!"
+        echo "Test result: ${{ needs.test.result }}"
+        echo "Release result: ${{ needs.release.result }}"
+        exit 1

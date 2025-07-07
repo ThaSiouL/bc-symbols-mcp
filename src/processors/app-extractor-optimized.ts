@@ -2,21 +2,33 @@ import AdmZip from 'adm-zip';
 import { createHash } from 'crypto';
 import { readFileSync } from 'fs';
 import { BCApp } from '../types/bc-types.js';
+import { LazyMemoryCache } from '../cache/lazy-cache.js';
 
-export class AppExtractor {
+export class OptimizedAppExtractor {
+  private lazyCache: LazyMemoryCache;
+
+  constructor(cache?: LazyMemoryCache) {
+    this.lazyCache = cache || new LazyMemoryCache();
+  }
+
   /**
-   * Extract and process a Business Central .app file
+   * Extract and process a Business Central .app file with lazy loading
    * @param filePath Path to the .app file
-   * @returns Promise<BCApp> Processed app data
+   * @returns Promise<BCApp> Processed app data with lazy-loaded symbols
    */
-  async extractApp(filePath: string): Promise<BCApp> {
+  async extractAppLazy(filePath: string): Promise<BCApp> {
     try {
       // Read the file and calculate hash
       const fileBuffer = readFileSync(filePath);
       const fileHash = this.calculateFileHash(fileBuffer);
 
+      // Check if already cached
+      const cachedApp = this.lazyCache.getAppMetadata(filePath, fileHash);
+      if (cachedApp) {
+        return cachedApp;
+      }
+
       // Create ZIP instance with the file buffer
-      // BC .app files have a 40-byte prefix before the actual ZIP data
       const zipBuffer = fileBuffer.subarray(40); // Skip the 40-byte prefix
       const zip = new AdmZip(zipBuffer);
       
@@ -31,10 +43,11 @@ export class AppExtractor {
       // Parse the manifest to get basic app info
       const manifest = await this.parseManifest(manifestXml);
       
-      // Use streaming parser for large symbol files
-      const symbolParser = await import('./symbol-parser.js');
-      const parser = new symbolParser.SymbolParser();
-      const symbols = await parser.parseSymbolReferenceStreaming(symbolsJson);
+      // Create minimal symbol reference (lazy loading will populate on demand)
+      const symbols = {
+        runtimeVersion: '',
+        namespaces: []
+      };
 
       // Create BCApp object
       const app: BCApp = {
@@ -56,10 +69,81 @@ export class AppExtractor {
         symbols
       };
 
+      // Store in lazy cache with symbol buffer for on-demand loading
+      await this.lazyCache.setLazy(filePath, app, symbolsJson);
+
       return app;
     } catch (error) {
       throw new Error(`Failed to extract app from ${filePath}: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
+  }
+
+  /**
+   * Load objects of specific type for an app
+   */
+  async loadObjectsByType(filePath: string, objectType: string): Promise<any[]> {
+    const fileBuffer = readFileSync(filePath);
+    const fileHash = this.calculateFileHash(fileBuffer);
+    
+    return await this.lazyCache.loadObjectsByType(filePath, fileHash, objectType);
+  }
+
+  /**
+   * Load specific object for an app
+   */
+  async loadObject(
+    filePath: string, 
+    objectType: string, 
+    objectId: number, 
+    objectName: string
+  ): Promise<any | null> {
+    const fileBuffer = readFileSync(filePath);
+    const fileHash = this.calculateFileHash(fileBuffer);
+    
+    return await this.lazyCache.loadObject(filePath, fileHash, objectType, objectId, objectName);
+  }
+
+  /**
+   * Get object metadata without loading full objects
+   */
+  getObjectMetadata(
+    filePath: string,
+    objectType: string,
+    objectId?: number,
+    objectName?: string
+  ): any[] {
+    const fileBuffer = readFileSync(filePath);
+    const fileHash = this.calculateFileHash(fileBuffer);
+    
+    return this.lazyCache.getObjectMetadata(filePath, fileHash, objectType, objectId, objectName);
+  }
+
+  /**
+   * Get loading statistics for an app
+   */
+  getLoadingStats(filePath: string): any {
+    const fileBuffer = readFileSync(filePath);
+    const fileHash = this.calculateFileHash(fileBuffer);
+    
+    return this.lazyCache.getLoadingStats(filePath, fileHash);
+  }
+
+  /**
+   * Pre-load commonly used object types for better performance
+   */
+  async preloadCommonObjects(filePath: string): Promise<void> {
+    const fileBuffer = readFileSync(filePath);
+    const fileHash = this.calculateFileHash(fileBuffer);
+    
+    // Pre-load tables and codeunits as they're commonly queried
+    await this.lazyCache.preloadObjects(filePath, fileHash, ['table', 'codeunit']);
+  }
+
+  /**
+   * Get cache statistics
+   */
+  getCacheStats(): any {
+    return this.lazyCache.getCacheStats();
   }
 
   /**
@@ -140,9 +224,6 @@ export class AppExtractor {
     };
   }
 
-  /**
-   * Transform ID ranges from XML format
-   */
   private transformIdRanges(idRangesData: any): any[] {
     if (!idRangesData || !idRangesData.IdRange) {
       return [];
@@ -155,9 +236,6 @@ export class AppExtractor {
     }));
   }
 
-  /**
-   * Transform dependencies from XML format
-   */
   private transformDependencies(dependenciesData: any): any[] {
     if (!dependenciesData || !dependenciesData.Dependency) {
       return [];
@@ -173,9 +251,6 @@ export class AppExtractor {
     }));
   }
 
-  /**
-   * Transform features from XML format
-   */
   private transformFeatures(featuresData: any): string[] {
     if (!featuresData || !featuresData.Feature) {
       return [];
@@ -185,9 +260,6 @@ export class AppExtractor {
     return features.map((feature: any) => typeof feature === 'string' ? feature : feature._);
   }
 
-  /**
-   * Transform suppress warnings from XML format
-   */
   private transformSuppressWarnings(suppressWarningsData: any): any[] {
     if (!suppressWarningsData || !suppressWarningsData.SuppressWarning) {
       return [];
@@ -199,9 +271,6 @@ export class AppExtractor {
     }));
   }
 
-  /**
-   * Transform resource exposure policy from XML format
-   */
   private transformResourceExposurePolicy(policyData: any): any {
     if (!policyData) {
       return {
@@ -220,9 +289,6 @@ export class AppExtractor {
     };
   }
 
-  /**
-   * Transform build info from XML format
-   */
   private transformBuildInfo(buildData: any): any {
     if (!buildData) {
       return {
@@ -237,51 +303,5 @@ export class AppExtractor {
       timestamp: buildData.$.Timestamp || '',
       compilerVersion: buildData.$.CompilerVersion || ''
     };
-  }
-
-  /**
-   * Parse SymbolReference.json content
-   */
-  private async parseSymbols(symbolsBuffer: Buffer): Promise<any> {
-    try {
-      let symbolsText = symbolsBuffer.toString('utf8');
-      // Remove UTF-8 BOM if present
-      if (symbolsText.charCodeAt(0) === 0xFEFF) {
-        symbolsText = symbolsText.slice(1);
-      }
-      return JSON.parse(symbolsText);
-    } catch (error) {
-      throw new Error(`Failed to parse SymbolReference.json: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  }
-
-  /**
-   * List all files in the ZIP archive
-   */
-  listFiles(filePath: string): string[] {
-    try {
-      const fileBuffer = readFileSync(filePath);
-      const zipBuffer = fileBuffer.subarray(40); // Skip the 40-byte prefix
-      const zip = new AdmZip(zipBuffer);
-      const entries = zip.getEntries();
-      return entries.map(entry => entry.entryName);
-    } catch (error) {
-      throw new Error(`Failed to list files in ${filePath}: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  }
-
-  /**
-   * Extract a specific file from the app
-   */
-  extractFile(filePath: string, targetFile: string): Buffer | null {
-    try {
-      const fileBuffer = readFileSync(filePath);
-      const zipBuffer = fileBuffer.subarray(40); // Skip the 40-byte prefix
-      const zip = new AdmZip(zipBuffer);
-      return this.extractFileFromZip(zip, targetFile);
-    } catch (error) {
-      console.warn(`Failed to extract ${targetFile} from ${filePath}:`, error);
-      return null;
-    }
   }
 }

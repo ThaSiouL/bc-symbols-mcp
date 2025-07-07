@@ -1,5 +1,10 @@
 # BC Symbols MCP Server
 
+[![Test](https://github.com/ThaSiouL/bc-symbols-mcp/actions/workflows/test.yml/badge.svg)](https://github.com/ThaSiouL/bc-symbols-mcp/actions/workflows/test.yml)
+[![Release](https://github.com/ThaSiouL/bc-symbols-mcp/actions/workflows/release.yml/badge.svg)](https://github.com/ThaSiouL/bc-symbols-mcp/actions/workflows/release.yml)
+[![CodeQL](https://github.com/ThaSiouL/bc-symbols-mcp/actions/workflows/codeql.yml/badge.svg)](https://github.com/ThaSiouL/bc-symbols-mcp/actions/workflows/codeql.yml)
+[![npm version](https://badge.fury.io/js/bc-symbols-mcp.svg)](https://badge.fury.io/js/bc-symbols-mcp)
+
 A Model Context Protocol (MCP) server for analyzing Business Central .app files and their symbol information. This server provides tools to extract, parse, and query BC object structures, dependencies, and relationships.
 
 ## Features
@@ -261,7 +266,7 @@ npm run format
 
 ## Requirements
 
-- Node.js 18+
+- Node.js 24+ (also supports 22.x and 20.x)
 - TypeScript 5.3+
 - Business Central .app files for analysis
 
@@ -271,8 +276,25 @@ npm run format
 2. Create a feature branch
 3. Make your changes
 4. Add tests if applicable
-5. Run linting and tests
+5. Run linting and tests: `npm run lint && npm test`
 6. Submit a pull request
+
+### Automated CI/CD
+
+This project uses GitHub Actions for continuous integration and deployment:
+
+- **🧪 Tests**: Automatically run on all pull requests and pushes to main
+- **🚀 Releases**: Automatic versioning and publishing when code is merged to main
+- **🔒 Security**: CodeQL security scanning and dependency updates
+- **📦 Dependencies**: Weekly automated dependency update PRs
+
+#### Version Control
+Releases are automatically versioned based on commit messages:
+- `feat:` → Minor version bump (1.0.0 → 1.1.0)
+- `fix:` → Patch version bump (1.0.0 → 1.0.1)  
+- `BREAKING CHANGE:` → Major version bump (1.0.0 → 2.0.0)
+
+Add `[skip ci]` to commit messages to skip automated workflows.
 
 ## License
 
