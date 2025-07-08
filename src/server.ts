@@ -138,22 +138,6 @@ class BCSymbolsServer {
   async start(): Promise<void> {
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
-    
-    console.error('BC Symbols MCP Server started successfully');
-    console.error('Server capabilities:');
-    console.error('- Resources: Access to app manifests, symbols, and object data');
-    console.error('- Tools: Load apps, query objects, analyze dependencies');
-    console.error('- Cache: In-memory caching with file hash validation');
-    console.error('');
-    console.error('Available resource patterns:');
-    const patterns = this.resources.getResourcePatterns();
-    patterns.forEach(pattern => console.error(`  - ${pattern}`));
-    console.error('');
-    console.error('Available tools:');
-    const tools = this.tools.getTools();
-    tools.forEach(tool => console.error(`  - ${tool.name}: ${tool.description}`));
-    console.error('');
-    console.error('Server is ready for connections...');
   }
 
   /**
