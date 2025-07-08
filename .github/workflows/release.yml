@@ -118,16 +118,59 @@ jobs:
         
         echo "changelog-file=CHANGELOG_TEMP.md" >> $GITHUB_OUTPUT
 
-    - name: Commit version bump
+    - name: Create version bump branch
       run: |
+        BRANCH_NAME="release/v${{ steps.bump.outputs.new-version }}"
+        git checkout -b "$BRANCH_NAME"
         git add package.json package-lock.json
         git commit -m "chore: bump version to v${{ steps.bump.outputs.new-version }} [skip ci]"
-        git tag "v${{ steps.bump.outputs.new-version }}"
+        git push origin "$BRANCH_NAME"
+        echo "branch-name=$BRANCH_NAME" >> $GITHUB_OUTPUT
+      id: branch
 
-    - name: Push changes
+    - name: Create version bump PR
       run: |
-        git push origin main
+        PR_URL=$(gh pr create \
+          --title "chore: bump version to v${{ steps.bump.outputs.new-version }}" \
+          --body "Automated version bump to v${{ steps.bump.outputs.new-version }}" \
+          --base main \
+          --head "${{ steps.branch.outputs.branch-name }}")
+        echo "pr-url=$PR_URL" >> $GITHUB_OUTPUT
+      id: pr
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Auto-merge version bump PR
+      run: |
+        # Enable auto-merge and merge the PR
+        gh pr merge "${{ steps.pr.outputs.pr-url }}" --auto --squash --delete-branch
+        
+        # Poll for merge completion instead of fixed sleep
+        echo "Waiting for PR to be merged..."
+        for i in {1..30}; do
+          if gh pr view "${{ steps.pr.outputs.pr-url }}" --json merged --jq '.merged' | grep -q true; then
+            echo "PR successfully merged!"
+            break
+          fi
+          echo "Attempt $i/30: PR not yet merged, waiting 10 seconds..."
+          sleep 10
+        done
+        
+        # Verify the PR was actually merged
+        if ! gh pr view "${{ steps.pr.outputs.pr-url }}" --json merged --jq '.merged' | grep -q true; then
+          echo "Error: PR was not merged after 5 minutes"
+          exit 1
+        fi
+        
+        # Switch back to main and pull the merged changes
+        git checkout main
+        git pull origin main
+        
+        # Create and push the tag
+        git tag "v${{ steps.bump.outputs.new-version }}"
         git push origin "v${{ steps.bump.outputs.new-version }}"
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Create GitHub Release
       uses: actions/create-release@v1
