@@ -1,6 +1,6 @@
 {
   "name": "bc-symbols-mcp",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "MCP server for analyzing Business Central .app files and BC object structures",
   "type": "module",
   "main": "dist/server.js",
@@ -34,7 +34,7 @@
   "author": "ThaSiouL",
   "repository": {
     "type": "git",
-    "url": "https://github.com/ThaSiouL/bc-symbols-mcp.git"
+    "url": "git+https://github.com/ThaSiouL/bc-symbols-mcp.git"
   },
   "homepage": "https://github.com/ThaSiouL/bc-symbols-mcp#readme",
   "bugs": {
