@@ -29,7 +29,7 @@ class BCSymbolsServer {
     this.server = new Server(
       {
         name: 'bc-symbols-mcp',
-        version: '1.0.9',
+        version: '1.1.0',
       },
       {
         capabilities: {
@@ -165,7 +165,7 @@ class BCSymbolsServer {
   } {
     return {
       name: 'bc-symbols-mcp',
-      version: '1.0.9',
+      version: '1.1.0',
       capabilities: ['resources', 'tools'],
       cacheStats: this.cache.getStats()
     };
