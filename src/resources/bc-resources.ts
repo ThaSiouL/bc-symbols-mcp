@@ -105,8 +105,8 @@ export class BCResources {
     const appId = url.hostname;
     const pathParts = url.pathname.split('/').filter(p => p);
     
-    if (pathParts.length < 1) {
-      throw new Error(`Invalid app resource URI: ${url.toString()}`);
+    if (pathParts.length < 2) {
+      throw new Error(`Invalid app resource URI: ${url.toString()}. At least two path segments are required.`);
     }
 
     const resourceType = pathParts[0];
