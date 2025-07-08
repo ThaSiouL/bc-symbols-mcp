@@ -48,8 +48,8 @@ class BCSymbolsServer {
     this.resources = new BCResources(this.cache);
     this.tools = new BCTools(this.cache);
 
-    console.log('BC Symbols MCP Server initialized');
-    console.log(`Cache expiration: 60 minutes`);
+    console.error('BC Symbols MCP Server initialized');
+    console.error(`Cache expiration: 60 minutes`);
 
     this.setupHandlers();
   }
@@ -200,7 +200,7 @@ function getPackageVersion(): string {
     const packageJson = JSON.parse(readFileSync(packagePath, 'utf8'));
     return packageJson.version;
   } catch (error) {
-    return FALLBACK_VERSION; // Fallback version
+    return '1.2.6'; // Fallback version
   }
 }
 
