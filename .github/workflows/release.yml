@@ -8,6 +8,7 @@ on:
       - 'docs/**'
       - '.github/**'
       - '**/*.md'
+  workflow_dispatch:
 
 jobs:
   test:
