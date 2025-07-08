@@ -161,7 +161,7 @@ jobs:
         
         # Verify the PR was actually merged
         if ! gh pr view "${{ steps.pr.outputs.pr-url }}" --json state --jq '.state' | grep -q "MERGED"; then
-          echo "Error: PR was not merged after 5 minutes"
+          echo "Error: PR was not merged within the maximum wait time of 5 minutes"
           exit 1
         fi
         
