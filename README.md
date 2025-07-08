@@ -5,58 +5,60 @@
 [![CodeQL](https://github.com/ThaSiouL/bc-symbols-mcp/actions/workflows/codeql.yml/badge.svg)](https://github.com/ThaSiouL/bc-symbols-mcp/actions/workflows/codeql.yml)
 [![npm version](https://badge.fury.io/js/bc-symbols-mcp.svg)](https://badge.fury.io/js/bc-symbols-mcp)
 
-A Model Context Protocol (MCP) server for analyzing Business Central .app files and their symbol information. This server provides tools to extract, parse, and query BC object structures, dependencies, and relationships.
+A Model Context Protocol (MCP) server that analyzes Microsoft Dynamics 365 Business Central .app files and provides intelligent insights about AL code, objects, dependencies, and relationships. Perfect for AL developers, consultants, and architects working with Business Central extensions.
 
-## Features
+## Use Cases
 
-- **App File Processing**: Extract and parse Business Central .app files (ZIP format with BC-specific structure)
-- **Symbol Analysis**: Parse NavxManifest.xml and SymbolReference.json for complete object definitions
-- **MCP Resources**: Access raw file data through structured URIs
-- **MCP Tools**: Structured queries for BC objects, dependencies, and references
-- **Caching**: In-memory caching with file hash-based invalidation
-- **Cross-App Analysis**: Analyze relationships and dependencies across multiple loaded apps
+### 🔍 **Code Analysis & Documentation**
+- Automatically analyze Business Central .app files to understand object structures
+- Generate documentation from AL code and symbol definitions
+- Explore dependencies between extensions and base application objects
+- Find usage patterns and relationships across multiple apps
 
-## Quick Installation
+### 🏗️ **Extension Development**
+- Quickly understand existing extension structures before making modifications
+- Identify potential conflicts between extensions
+- Analyze object dependencies to plan safe updates
+- Find references to tables, fields, and procedures across the codebase
 
-### Using Claude MCP Add (Recommended)
+### 🔧 **Troubleshooting & Maintenance**
+- Investigate runtime issues by examining object relationships
+- Find all references to deprecated objects or fields
+- Analyze extension compatibility with base application updates
+- Understand impact of changes across dependent extensions
 
-```bash
-# Install directly from npm
-claude mcp add bc-symbols-mcp
-```
+### 📊 **Architecture Review**
+- Review extension design patterns and best practices
+- Analyze object distribution and naming conventions
+- Identify circular dependencies and architectural issues
+- Generate reports on extension complexity and size
 
-### Using npm
+## Installation
 
-```bash
-# Install globally
-npm install -g bc-symbols-mcp
+### VS Code (Claude Dev Extension)
 
-# Or install locally in your project
-npm install bc-symbols-mcp
-```
+1. Install the [Claude Dev extension](https://marketplace.visualstudio.com/items?itemName=saoudrizwan.claude-dev) in VS Code
+2. Add to your Claude Dev MCP configuration in VS Code settings:
 
-### From Source
-
-```bash
-# Clone the repository
-git clone https://github.com/ThaSiouL/bc-symbols-mcp.git
-cd bc-symbols-mcp
-
-# Install dependencies and build
-npm install
-npm run build
-```
-
-## Usage
-
-### Configuration for Claude Desktop
-
-Add the following to your Claude Desktop configuration file:
-
-#### Option 1: Using npm global installation
 ```json
 {
-  "mcpServers": {
+  "claude-dev.mcpServers": {
+    "bc-symbols": {
+      "command": "npx",
+      "args": ["bc-symbols-mcp"]
+    }
+  }
+}
+```
+
+Or if you prefer global installation:
+```bash
+npm install -g bc-symbols-mcp
+```
+
+```json
+{
+  "claude-dev.mcpServers": {
     "bc-symbols": {
       "command": "bc-symbols-mcp"
     }
@@ -64,7 +66,10 @@ Add the following to your Claude Desktop configuration file:
 }
 ```
 
-#### Option 2: Using npx (no installation required)
+### Claude Desktop
+
+Add to your Claude Desktop configuration file (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS):
+
 ```json
 {
   "mcpServers": {
@@ -76,187 +81,156 @@ Add the following to your Claude Desktop configuration file:
 }
 ```
 
-#### Option 3: From source
+### Claude Code CLI
+
+If using Claude Code CLI, add to your MCP configuration:
+
 ```json
 {
   "mcpServers": {
     "bc-symbols": {
-      "command": "node",
-      "args": ["/path/to/bc-symbols-mcp/dist/server.js"],
-      "cwd": "/path/to/bc-symbols-mcp"
+      "command": "bc-symbols-mcp"
     }
   }
 }
 ```
 
-## MCP Resources
+### Manual Installation
 
-The server provides the following resource types:
+```bash
+# Install globally
+npm install -g bc-symbols-mcp
 
-### App-Specific Resources
-- `bc-app://{appId}/manifest` - App manifest data
-- `bc-app://{appId}/symbols` - Symbol reference data  
-- `bc-app://{appId}/objects/{objectType}` - Objects by type (table, page, codeunit, etc.)
-- `bc-app://{appId}/info` - Basic app information
-- `bc-app://{appId}/dependencies` - Dependency information
+# Or use directly with npx (no installation needed)
+npx bc-symbols-mcp
+```
 
-### Global Resources
-- `bc-apps://all` - List of all loaded apps
-- `bc-apps://cache-stats` - Cache statistics
+## Available Commands
 
-## MCP Tools
+### 🚀 **Getting Started Commands**
 
-The server provides the following tools:
-
-### `load_app_file`
-Load and parse a Business Central .app file.
+#### `configure_app_sources`
+Set up paths to your Business Central .app files for analysis.
 
 **Parameters:**
-- `filePath` (string): Path to the .app file
+- `paths` (string[]): Array of file paths or directory paths containing .app files
+- `autoLoad` (boolean, optional): Automatically load discovered app files (default: true)
+- `recursive` (boolean, optional): Scan subdirectories recursively (default: true)
+- `replace` (boolean, optional): Replace existing configuration instead of appending (default: false)
 
 **Example:**
 ```json
 {
-  "filePath": "/path/to/app.app"
+  "paths": [
+    "/path/to/MyExtension_1.0.0.0.app",
+    "/path/to/extensions/directory",
+    "C:\\AL\\Extensions"
+  ],
+  "autoLoad": true,
+  "recursive": true
 }
 ```
 
-### `query_objects`
-Query BC objects by type, name, or ID across loaded apps.
+#### `get_app_sources`
+View current configuration and discovered .app files.
 
 **Parameters:**
-- `appIds` (string[], optional): App IDs to search in
-- `objectType` (string, optional): Type of object (table, page, codeunit, etc.)
-- `objectName` (string, optional): Name of the object
-- `objectId` (number, optional): ID of the object
-- `includeExtensions` (boolean, optional): Include extension objects
+- `rescan` (boolean, optional): Rescan directories for app files (default: false)
 
-### `analyze_dependencies`
-Analyze dependencies for a specific app.
-
-**Parameters:**
-- `appId` (string): ID of the app to analyze
-- `includeTransitive` (boolean, optional): Include transitive dependencies
-- `direction` (string, optional): Direction of dependencies (incoming, outgoing, both)
-
-### `find_references`
-Find references to a specific object, field, or method.
-
-**Parameters:**
-- `appIds` (string[], optional): App IDs to search in
-- `objectType` (string): Type of the target object
-- `objectName` (string): Name of the target object
-- `fieldName` (string, optional): Field to find references to
-- `methodName` (string, optional): Method to find references to
-
-### `get_object_details`
-Get detailed information about a specific BC object.
-
-**Parameters:**
-- `appId` (string): App ID containing the object
-- `objectType` (string): Type of the object
-- `objectIdentifier` (string): Name or ID of the object
-
-### `list_loaded_apps`
-List all loaded apps with their basic information.
-
-### `get_app_info`
-Get detailed information about a specific app.
-
-**Parameters:**
-- `appId` (string): ID of the app
-
-### `clear_cache`
-Clear the app cache.
-
-## File Format Support
-
-### Business Central .app Files
-- ZIP format with 40-byte prefix
-- Contains NavxManifest.xml for app metadata
-- Contains SymbolReference.json for object definitions
-- Includes AL source code and other resources
-
-### Supported BC Object Types
-- Tables and Table Extensions
-- Pages and Page Extensions  
-- Codeunits
-- Reports and Report Extensions
-- XMLPorts
-- Queries
-- Enums
-- Interfaces
-- Permission Sets and Extensions
-- Control Add-ins
-
-## Architecture
-
-```
-src/
-├── server.ts              # Main MCP server implementation
-├── processors/
-│   ├── app-extractor.ts    # ZIP extraction and parsing
-│   └── symbol-parser.ts    # SymbolReference.json parsing
-├── cache/
-│   └── memory-cache.ts     # In-memory caching
-├── resources/
-│   └── bc-resources.ts     # MCP Resources implementation
-├── tools/
-│   └── bc-tools.ts         # MCP Tools implementation
-└── types/
-    └── bc-types.ts         # TypeScript type definitions
-```
-
-## Development
-
-```bash
-# Install dependencies
-npm install
-
-# Build the project
-npm run build
-
-# Run in development mode (watch)
-npm run dev
-
-# Run tests
-npm test
-
-# Lint code
-npm run lint
-
-# Format code
-npm run format
-```
-
-## Examples
-
-### Loading an App File
-```typescript
-// Using the load_app_file tool
+**Example:**
+```json
 {
-  "filePath": "/path/to/MyApp_1.0.0.0.app"
+  "rescan": true
 }
 ```
 
-### Querying Objects
-```typescript
-// Find all tables in a specific app
+### 📁 **App Management Commands**
+
+#### `load_app_file`
+Load and parse a specific Business Central .app file.
+
+**Example:**
+```json
 {
-  "appIds": ["d543d3b8-6359-46d3-ab38-cd4cdd79457f"],
+  "filePath": "/path/to/MyExtension_1.0.0.0.app"
+}
+```
+
+#### `list_loaded_apps`
+List all currently loaded apps with their basic information.
+
+**Example:**
+```json
+{}
+```
+
+#### `get_app_info`
+Get detailed information about a specific app including dependencies and object counts.
+
+**Example:**
+```json
+{
+  "appId": "d543d3b8-6359-46d3-ab38-cd4cdd79457f"
+}
+```
+
+### 🔍 **Object Analysis Commands**
+
+#### `query_objects`
+Search for Business Central objects across loaded apps.
+
+**Parameters:**
+- `appIds` (string[], optional): Specific app IDs to search in
+- `objectType` (string, optional): Object type (table, page, codeunit, report, etc.)
+- `objectName` (string, optional): Object name (supports partial matching)
+- `objectId` (number, optional): Specific object ID
+- `includeExtensions` (boolean, optional): Include extension objects (default: true)
+
+**Examples:**
+```json
+// Find all tables across all loaded apps
+{
   "objectType": "table"
 }
 
-// Find a specific page by name
+// Find Customer-related pages in a specific app
 {
+  "appIds": ["d543d3b8-6359-46d3-ab38-cd4cdd79457f"],
   "objectType": "page",
-  "objectName": "Customer Card"
+  "objectName": "Customer"
+}
+
+// Find object by ID
+{
+  "objectType": "table",
+  "objectId": 18
 }
 ```
 
-### Analyzing Dependencies
-```typescript
-// Get all dependencies for an app
+#### `get_object_details`
+Get comprehensive details about a specific Business Central object.
+
+**Example:**
+```json
+{
+  "appId": "d543d3b8-6359-46d3-ab38-cd4cdd79457f",
+  "objectType": "table",
+  "objectIdentifier": "Customer"
+}
+```
+
+### 🔗 **Dependency Analysis Commands**
+
+#### `analyze_dependencies`
+Analyze dependencies for a specific app.
+
+**Parameters:**
+- `appId` (string): App ID to analyze
+- `includeTransitive` (boolean, optional): Include indirect dependencies (default: true)
+- `direction` (string, optional): Direction of analysis (incoming, outgoing, both)
+
+**Example:**
+```json
 {
   "appId": "d543d3b8-6359-46d3-ab38-cd4cdd79457f",
   "includeTransitive": true,
@@ -264,11 +238,130 @@ npm run format
 }
 ```
 
+#### `find_references`
+Find all references to a specific object, field, or method across loaded apps.
+
+**Parameters:**
+- `appIds` (string[], optional): Specific apps to search in
+- `objectType` (string): Type of the target object
+- `objectName` (string): Name of the target object
+- `fieldName` (string, optional): Specific field to find references to
+- `methodName` (string, optional): Specific method to find references to
+
+**Examples:**
+```json
+// Find all references to Customer table
+{
+  "objectType": "table",
+  "objectName": "Customer"
+}
+
+// Find references to a specific field
+{
+  "objectType": "table",
+  "objectName": "Customer",
+  "fieldName": "Name"
+}
+
+// Find references to a specific method
+{
+  "objectType": "codeunit",
+  "objectName": "Sales-Post",
+  "methodName": "PostInvoice"
+}
+```
+
+### 🧹 **Utility Commands**
+
+#### `clear_cache`
+Clear the app cache to free memory or reload modified files.
+
+**Example:**
+```json
+{}
+```
+
+## Supported BC Object Types
+
+- **Tables** and **Table Extensions**
+- **Pages** and **Page Extensions**
+- **Codeunits**
+- **Reports** and **Report Extensions**
+- **XMLPorts**
+- **Queries**
+- **Enums**
+- **Interfaces**
+- **Permission Sets** and **Permission Set Extensions**
+- **Control Add-ins**
+
+## MCP Resources
+
+Access raw data through structured URIs:
+
+### App-Specific Resources
+- `bc-app://{appId}/manifest` - App manifest data
+- `bc-app://{appId}/symbols` - Symbol reference data  
+- `bc-app://{appId}/objects/{objectType}` - Objects by type
+- `bc-app://{appId}/info` - Basic app information
+- `bc-app://{appId}/dependencies` - Dependency information
+
+### Global Resources
+- `bc-apps://all` - List of all loaded apps
+- `bc-apps://cache-stats` - Cache statistics
+
+## Example Workflow
+
+Here's a typical workflow for analyzing a Business Central extension:
+
+1. **Configure your app sources:**
+```json
+{
+  "paths": ["/path/to/extensions/directory"],
+  "autoLoad": true,
+  "recursive": true
+}
+```
+
+2. **Explore loaded apps:**
+```json
+{}
+// Use list_loaded_apps command
+```
+
+3. **Analyze a specific extension:**
+```json
+{
+  "appId": "your-extension-id",
+  "includeTransitive": true,
+  "direction": "both"
+}
+// Use analyze_dependencies command
+```
+
+4. **Find object relationships:**
+```json
+{
+  "objectType": "table",
+  "objectName": "Customer"
+}
+// Use find_references command
+```
+
+5. **Get detailed object information:**
+```json
+{
+  "appId": "your-extension-id",
+  "objectType": "page",
+  "objectIdentifier": "Customer List"
+}
+// Use get_object_details command
+```
+
 ## Requirements
 
-- Node.js 24+ (also supports 22.x and 20.x)
-- TypeScript 5.3+
+- Node.js 20+ (recommended: 24+)
 - Business Central .app files for analysis
+- VS Code with Claude Dev extension, Claude Desktop, or Claude Code CLI
 
 ## Contributing
 
@@ -278,23 +371,6 @@ npm run format
 4. Add tests if applicable
 5. Run linting and tests: `npm run lint && npm test`
 6. Submit a pull request
-
-### Automated CI/CD
-
-This project uses GitHub Actions for continuous integration and deployment:
-
-- **🧪 Tests**: Automatically run on all pull requests and pushes to main
-- **🚀 Releases**: Automatic versioning and publishing when code is merged to main
-- **🔒 Security**: CodeQL security scanning and dependency updates
-- **📦 Dependencies**: Weekly automated dependency update PRs
-
-#### Version Control
-Releases are automatically versioned based on commit messages:
-- `feat:` → Minor version bump (1.0.0 → 1.1.0)
-- `fix:` → Patch version bump (1.0.0 → 1.0.1)  
-- `BREAKING CHANGE:` → Major version bump (1.0.0 → 2.0.0)
-
-Add `[skip ci]` to commit messages to skip automated workflows.
 
 ## License
 

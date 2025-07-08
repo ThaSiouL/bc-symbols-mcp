@@ -3,13 +3,17 @@ import { BCApp, ObjectQuery, DependencyQuery, ReferenceQuery } from '../types/bc
 import { AppExtractor } from '../processors/app-extractor.js';
 import { SymbolParser } from '../processors/symbol-parser.js';
 import { MemoryCache } from '../cache/memory-cache.js';
-import { readFileSync } from 'fs';
+import { readFileSync, existsSync } from 'fs';
+import { stat, readdir } from 'fs/promises';
 import { createHash } from 'crypto';
+import { join, extname, resolve } from 'path';
 
 export class BCTools {
   private cache: MemoryCache;
   private appExtractor: AppExtractor;
   private symbolParser: SymbolParser;
+  private configuredSources: string[] = [];
+  private discoveredFiles: string[] = [];
 
   constructor(cache: MemoryCache) {
     this.cache = cache;
@@ -171,6 +175,46 @@ export class BCTools {
           type: 'object',
           properties: {}
         }
+      },
+      {
+        name: 'configure_app_sources',
+        description: 'Configure app file paths and directories to analyze',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            paths: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Array of file paths or directory paths containing .app files'
+            },
+            autoLoad: {
+              type: 'boolean',
+              description: 'Automatically load discovered app files (default: true)'
+            },
+            recursive: {
+              type: 'boolean',
+              description: 'Scan subdirectories recursively (default: true)'
+            },
+            replace: {
+              type: 'boolean',
+              description: 'Replace existing configuration instead of appending (default: false)'
+            }
+          },
+          required: ['paths']
+        }
+      },
+      {
+        name: 'get_app_sources',
+        description: 'Get current app source configuration and discovered files',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            rescan: {
+              type: 'boolean',
+              description: 'Rescan directories for app files (default: false)'
+            }
+          }
+        }
       }
     ];
   }
@@ -203,6 +247,12 @@ export class BCTools {
       
       case 'clear_cache':
         return this.clearCache();
+      
+      case 'configure_app_sources':
+        return this.configureAppSources(arguments_);
+      
+      case 'get_app_sources':
+        return this.getAppSources(arguments_);
       
       default:
         throw new Error(`Unknown tool: ${name}`);
@@ -594,6 +644,227 @@ export class BCTools {
         error: error instanceof Error ? error.message : 'Unknown error'
       };
     }
+  }
+
+  /**
+   * Configure app sources
+   */
+  private async configureAppSources(args: {
+    paths: string[];
+    autoLoad?: boolean;
+    recursive?: boolean;
+    replace?: boolean;
+  }): Promise<any> {
+    try {
+      const { paths, autoLoad = true, recursive = true, replace = false } = args;
+      
+      // Validate inputs
+      if (!paths || paths.length === 0) {
+        return {
+          success: false,
+          error: 'No paths provided'
+        };
+      }
+
+      // Validate and resolve paths
+      const validatedPaths: string[] = [];
+      const invalidPaths: string[] = [];
+      
+      for (const path of paths) {
+        const resolvedPath = resolve(path);
+        if (existsSync(resolvedPath)) {
+          validatedPaths.push(resolvedPath);
+        } else {
+          invalidPaths.push(path);
+        }
+      }
+
+      if (invalidPaths.length > 0) {
+        return {
+          success: false,
+          error: `Invalid paths: ${invalidPaths.join(', ')}`
+        };
+      }
+
+      // Update configuration
+      if (replace) {
+        this.configuredSources = validatedPaths;
+      } else {
+        // Append new paths, avoiding duplicates
+        for (const path of validatedPaths) {
+          if (!this.configuredSources.includes(path)) {
+            this.configuredSources.push(path);
+          }
+        }
+      }
+
+      // Scan for app files
+      this.discoveredFiles = await this.scanForAppFiles(this.configuredSources, recursive);
+      
+      // Auto-load discovered apps if requested
+      const loadResults: any[] = [];
+      if (autoLoad) {
+        for (const appFile of this.discoveredFiles) {
+          try {
+            const result = await this.loadAppFile(appFile);
+            loadResults.push({
+              file: appFile,
+              result
+            });
+          } catch (error) {
+            loadResults.push({
+              file: appFile,
+              result: {
+                success: false,
+                error: error instanceof Error ? error.message : 'Unknown error'
+              }
+            });
+          }
+        }
+      }
+
+      return {
+        success: true,
+        message: 'App sources configured successfully',
+        configuration: {
+          configuredSources: this.configuredSources,
+          discoveredFiles: this.discoveredFiles,
+          fileCount: this.discoveredFiles.length
+        },
+        autoLoad: {
+          enabled: autoLoad,
+          results: loadResults,
+          successCount: loadResults.filter(r => r.result.success).length,
+          failureCount: loadResults.filter(r => !r.result.success).length
+        }
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
+
+  /**
+   * Get app sources
+   */
+  private async getAppSources(args: { rescan?: boolean } = {}): Promise<any> {
+    try {
+      const { rescan = false } = args;
+      
+      if (this.configuredSources.length > 0) {
+        // Scan for app files if requested or if this is the first call
+        if (rescan || this.discoveredFiles.length === 0) {
+          this.discoveredFiles = await this.scanForAppFiles(this.configuredSources, true);
+        }
+      }
+      
+      // Get loaded apps information
+      const loadedApps = this.cache.getValidCachedApps();
+      const loadedFilePaths = loadedApps.map(app => app.filePath).filter(Boolean);
+      
+      // Categorize discovered files
+      const categorizedFiles = {
+        loaded: this.discoveredFiles.filter(file => loadedFilePaths.includes(file)),
+        notLoaded: this.discoveredFiles.filter(file => !loadedFilePaths.includes(file))
+      };
+      
+      return {
+        success: true,
+        configuration: {
+          configuredSources: this.configuredSources,
+          sourceCount: this.configuredSources.length
+        },
+        discoveredFiles: {
+          files: this.discoveredFiles,
+          totalCount: this.discoveredFiles.length,
+          loaded: categorizedFiles.loaded,
+          loadedCount: categorizedFiles.loaded.length,
+          notLoaded: categorizedFiles.notLoaded,
+          notLoadedCount: categorizedFiles.notLoaded.length
+        },
+        loadedApps: loadedApps.map(app => ({
+          id: app.id,
+          name: app.name,
+          publisher: app.publisher,
+          version: app.version,
+          filePath: app.filePath
+        }))
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
+
+  /**
+   * Scan for app files in configured sources
+   */
+  private async scanForAppFiles(sources: string[], recursive: boolean): Promise<string[]> {
+    const appFiles: string[] = [];
+    
+    const filePromises = sources.map(async (source) => {
+      try {
+        const stats = await stat(source);
+        
+        if (stats.isFile() && extname(source).toLowerCase() === '.app') {
+          return [source];
+        } else if (stats.isDirectory()) {
+          return await this.scanDirectory(source, recursive);
+        }
+      } catch (error) {
+        // Silently skip sources that can't be accessed
+        return [];
+      }
+    });
+    
+    const results = await Promise.all(filePromises);
+    const appFiles = results.flat();
+    
+    // Remove duplicates and sort
+    return [...new Set(appFiles)].sort();
+  }
+
+  /**
+   * Scan a directory for app files
+   */
+  private async scanDirectory(directory: string, recursive: boolean): Promise<string[]> {
+    const appFiles: string[] = [];
+    
+    try {
+      const entries = await readdir(directory);
+      
+      for (const entry of entries) {
+        const fullPath = join(directory, entry);
+        
+        try {
+          const stats = await stat(fullPath);
+          
+          if (stats.isFile() && extname(entry).toLowerCase() === '.app') {
+            appFiles.push(fullPath);
+          } else if (stats.isDirectory() && recursive) {
+            const subdirectoryFiles = await this.scanDirectory(fullPath, recursive);
+            appFiles.push(...subdirectoryFiles);
+          }
+        } catch (error) {
+          // Silently skip files/directories that can't be accessed
+        }
+      }
+    } catch (error) {
+      // Silently skip directories that can't be read
+    }
+    
+    return appFiles;
+  }
+
+  /**
+   * Get configured app sources
+   */
+  getConfiguredSources(): string[] {
+    return [...this.configuredSources];
   }
 
   /**
