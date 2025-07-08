@@ -127,17 +127,6 @@ class BCSymbolsServer {
     this.server.onerror = (error) => {
       console.error('[MCP Error]', error);
     };
-
-    // Process handlers
-    process.on('SIGINT', async () => {
-      await this.shutdown();
-      process.exit(0);
-    });
-
-    process.on('SIGTERM', async () => {
-      await this.shutdown();
-      process.exit(0);
-    });
   }
 
   /**
@@ -155,6 +144,21 @@ class BCSymbolsServer {
     
     console.error('BC Symbols MCP Server ready');
     console.error('Listening on stdio transport');
+
+    // Keep the server running until explicitly shut down
+    return new Promise<void>((resolve) => {
+      const cleanup = () => {
+        console.error('Received shutdown signal');
+        this.shutdown().then(() => resolve());
+      };
+
+      // Handle shutdown signals
+      process.once('SIGINT', cleanup);
+      process.once('SIGTERM', cleanup);
+      
+      // Store cleanup function for manual shutdown
+      (this as any)._cleanup = cleanup;
+    });
   }
 
   /**
