@@ -806,20 +806,23 @@ export class BCTools {
   private async scanForAppFiles(sources: string[], recursive: boolean): Promise<string[]> {
     const appFiles: string[] = [];
     
-    for (const source of sources) {
+    const filePromises = sources.map(async (source) => {
       try {
         const stats = await stat(source);
         
         if (stats.isFile() && extname(source).toLowerCase() === '.app') {
-          appFiles.push(source);
+          return [source];
         } else if (stats.isDirectory()) {
-          const directoryFiles = await this.scanDirectory(source, recursive);
-          appFiles.push(...directoryFiles);
+          return await this.scanDirectory(source, recursive);
         }
       } catch (error) {
         // Silently skip sources that can't be accessed
+        return [];
       }
-    }
+    });
+    
+    const results = await Promise.all(filePromises);
+    const appFiles = results.flat();
     
     // Remove duplicates and sort
     return [...new Set(appFiles)].sort();
