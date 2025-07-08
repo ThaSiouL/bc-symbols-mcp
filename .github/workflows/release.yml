@@ -151,12 +151,12 @@ jobs:
         # Poll for merge completion instead of fixed sleep
         echo "Waiting for PR to be merged..."
         for i in {1..30}; do
+          sleep 10
           if gh pr view "${{ steps.pr.outputs.pr-url }}" --json state --jq '.state' | grep -q "MERGED"; then
             echo "PR successfully merged!"
             break
           fi
           echo "Attempt $i/30: PR not yet merged, waiting 10 seconds..."
-          sleep 10
         done
         
         # Verify the PR was actually merged
