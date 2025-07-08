@@ -1,6 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach, jest } from '@jest/globals';
 import { BCSymbolsServer } from '../server.js';
-import { createMockBCApp } from './helpers/test-data.js';
 
 describe('MCP Server Protocol Compliance', () => {
   let server: BCSymbolsServer;
