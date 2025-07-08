@@ -9,6 +9,11 @@ import {
   ReadResourceRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 
+import { parseArgs } from 'node:util';
+import { readFileSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { MemoryCache } from './cache/memory-cache.js';
 import { BCResources } from './resources/bc-resources.js';
 import { BCTools } from './tools/bc-tools.js';
@@ -29,7 +34,7 @@ class BCSymbolsServer {
     this.server = new Server(
       {
         name: 'bc-symbols-mcp',
-        version: '1.2.5',
+        version: getPackageVersion(),
       },
       {
         capabilities: {
@@ -42,6 +47,9 @@ class BCSymbolsServer {
     this.cache = new MemoryCache(60); // 60-minute cache expiration
     this.resources = new BCResources(this.cache);
     this.tools = new BCTools(this.cache);
+
+    console.error('BC Symbols MCP Server initialized');
+    console.error(`Cache expiration: 60 minutes`);
 
     this.setupHandlers();
   }
@@ -136,8 +144,17 @@ class BCSymbolsServer {
    * Start the server
    */
   async start(): Promise<void> {
+    console.error('BC Symbols MCP Server starting...');
+    
+    const serverInfo = this.getServerInfo();
+    console.error(`Version: ${serverInfo.version}`);
+    console.error(`Capabilities: ${serverInfo.capabilities.join(', ')}`);
+    
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
+    
+    console.error('BC Symbols MCP Server ready');
+    console.error('Listening on stdio transport');
   }
 
   /**
@@ -165,7 +182,7 @@ class BCSymbolsServer {
   } {
     return {
       name: 'bc-symbols-mcp',
-      version: '1.2.5',
+      version: getPackageVersion(),
       capabilities: ['resources', 'tools'],
       cacheStats: this.cache.getStats()
     };
@@ -173,9 +190,95 @@ class BCSymbolsServer {
 }
 
 /**
+ * Helper function to get package.json version
+ */
+function getPackageVersion(): string {
+  try {
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = dirname(__filename);
+    const packagePath = join(__dirname, '../package.json');
+    const packageJson = JSON.parse(readFileSync(packagePath, 'utf8'));
+    return packageJson.version;
+  } catch (error) {
+    return '1.2.6'; // Fallback version
+  }
+}
+
+/**
+ * Show help text
+ */
+function showHelp(): void {
+  const helpText = `
+BC Symbols MCP Server v${getPackageVersion()}
+
+USAGE:
+  bc-symbols-mcp [OPTIONS]
+
+DESCRIPTION:
+  Model Context Protocol (MCP) server for analyzing Microsoft Dynamics 365 
+  Business Central .app files and their symbol information.
+
+OPTIONS:
+  -h, --help     Show this help message and exit
+  -v, --version  Show version information and exit
+
+EXAMPLES:
+  bc-symbols-mcp              # Start the MCP server
+  bc-symbols-mcp --version    # Show version
+  bc-symbols-mcp --help       # Show this help
+
+For more information, visit: https://github.com/ThaSiouL/bc-symbols-mcp
+`;
+  console.log(helpText.trim());
+}
+
+/**
+ * Show version information
+ */
+function showVersion(): void {
+  console.log(`bc-symbols-mcp v${getPackageVersion()}`);
+}
+
+/**
  * Main entry point
  */
 async function main(): Promise<void> {
+  // Parse command line arguments
+  let parsedArgs;
+  try {
+    parsedArgs = parseArgs({
+      options: {
+        help: { 
+          type: 'boolean', 
+          short: 'h' 
+        },
+        version: { 
+          type: 'boolean', 
+          short: 'v' 
+        }
+      },
+      allowPositionals: false,
+      strict: true
+    });
+  } catch (error) {
+    console.error('Error: Invalid command line arguments');
+    console.error('Use --help for usage information');
+    process.exit(1);
+  }
+
+  // Handle help flag
+  if (parsedArgs.values.help) {
+    showHelp();
+    process.exit(0);
+  }
+
+  // Handle version flag
+  if (parsedArgs.values.version) {
+    showVersion();
+    process.exit(0);
+  }
+
+  // Continue with normal server startup
   const server = new BCSymbolsServer();
   
   try {
@@ -197,10 +300,12 @@ process.on('uncaughtException', (error) => {
   process.exit(1);
 });
 
-// Start the server when this module is executed
-main().catch((error) => {
-  console.error('Fatal error:', error);
-  process.exit(1);
-});
+// Start the server when this module is executed directly (not imported)
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main().catch((error) => {
+    console.error('Fatal error:', error);
+    process.exit(1);
+  });
+}
 
 export { BCSymbolsServer };
