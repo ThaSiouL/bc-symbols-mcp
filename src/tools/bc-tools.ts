@@ -804,8 +804,6 @@ export class BCTools {
    * Scan for app files in configured sources
    */
   private async scanForAppFiles(sources: string[], recursive: boolean): Promise<string[]> {
-    const appFiles: string[] = [];
-    
     const filePromises = sources.map(async (source) => {
       try {
         const stats = await stat(source);
@@ -815,6 +813,7 @@ export class BCTools {
         } else if (stats.isDirectory()) {
           return await this.scanDirectory(source, recursive);
         }
+        return [];
       } catch (error) {
         // Silently skip sources that can't be accessed
         return [];
@@ -822,17 +821,17 @@ export class BCTools {
     });
     
     const results = await Promise.all(filePromises);
-    const appFiles = results.flat();
+    const foundFiles = results.flat();
     
     // Remove duplicates and sort
-    return [...new Set(appFiles)].sort();
+    return [...new Set(foundFiles)].sort();
   }
 
   /**
    * Scan a directory for app files
    */
   private async scanDirectory(directory: string, recursive: boolean): Promise<string[]> {
-    const appFiles: string[] = [];
+    const foundFiles: string[] = [];
     
     try {
       const entries = await readdir(directory);
@@ -844,10 +843,10 @@ export class BCTools {
           const stats = await stat(fullPath);
           
           if (stats.isFile() && extname(entry).toLowerCase() === '.app') {
-            appFiles.push(fullPath);
+            foundFiles.push(fullPath);
           } else if (stats.isDirectory() && recursive) {
             const subdirectoryFiles = await this.scanDirectory(fullPath, recursive);
-            appFiles.push(...subdirectoryFiles);
+            foundFiles.push(...subdirectoryFiles);
           }
         } catch (error) {
           // Silently skip files/directories that can't be accessed
@@ -857,7 +856,7 @@ export class BCTools {
       // Silently skip directories that can't be read
     }
     
-    return appFiles;
+    return foundFiles;
   }
 
   /**
