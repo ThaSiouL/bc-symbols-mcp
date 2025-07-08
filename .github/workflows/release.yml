@@ -146,98 +146,16 @@ jobs:
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Auto-merge version bump PR
+    - name: Enable auto-merge for version bump PR
       run: |
-        # Enable auto-merge and merge the PR
+        # Enable auto-merge - GitHub will handle the merge when checks pass
         gh pr merge "${{ steps.pr.outputs.pr-url }}" --auto --squash --delete-branch
-        
-        # Poll for merge completion instead of fixed sleep
-        echo "Waiting for PR to be merged..."
-        for i in {1..30}; do
-          if gh pr view "${{ steps.pr.outputs.pr-url }}" --json state --jq '.state' | grep -q "MERGED"; then
-            echo "PR successfully merged!"
-            break
-          fi
-          echo "Attempt $i/30: PR not yet merged, waiting 10 seconds..."
-          sleep 10
-        done
-        
-        # Verify the PR was actually merged
-        if ! gh pr view "${{ steps.pr.outputs.pr-url }}" --json state --jq '.state' | grep -q "MERGED"; then
-          echo "Error: PR was not merged within the maximum wait time of 5 minutes"
-          exit 1
-        fi
-        
-        # Switch back to main and pull the merged changes
-        git checkout main
-        git pull origin main
-        
-        # Create and push the tag
-        git tag "v${{ steps.bump.outputs.new-version }}"
-        git push origin "v${{ steps.bump.outputs.new-version }}"
+        echo "✅ Auto-merge enabled for PR: ${{ steps.pr.outputs.pr-url }}"
+        echo "🔄 GitHub will automatically merge when all checks pass"
+        echo "📋 The post-merge workflow will handle tagging and release creation"
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Create GitHub Release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: v${{ steps.bump.outputs.new-version }}
-        release_name: Release v${{ steps.bump.outputs.new-version }}
-        body_path: ${{ steps.changelog.outputs.changelog-file }}
-        draft: false
-        prerelease: false
-
-    - name: Publish to NPM
-      if: success()
-      env:
-        NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-      run: |
-        # Only publish if we have an NPM token
-        if [ -n "$NODE_AUTH_TOKEN" ]; then
-          npm publish --access public
-          echo "✅ Published to NPM successfully"
-        else
-          echo "⚠️ NPM_TOKEN not found, skipping NPM publish"
-        fi
-
-    - name: Create MCP Installation Instructions
-      if: success()
-      run: |
-        cat > INSTALL_INSTRUCTIONS.md << EOF
-        # BC Symbols MCP v${{ steps.bump.outputs.new-version }} Installation
-        
-        ## NPM Installation
-        \`\`\`bash
-        npm install -g bc-symbols-mcp@${{ steps.bump.outputs.new-version }}
-        \`\`\`
-        
-        ## Direct MCP Installation
-        \`\`\`bash
-        npx @modelcontextprotocol/cli install bc-symbols-mcp
-        \`\`\`
-        
-        ## Usage
-        Add to your MCP client configuration:
-        \`\`\`json
-        {
-          "mcpServers": {
-            "bc-symbols": {
-              "command": "bc-symbols-mcp",
-              "args": []
-            }
-          }
-        }
-        \`\`\`
-        EOF
-
-    - name: Upload installation instructions
-      uses: actions/upload-artifact@v4
-      with:
-        name: installation-instructions-v${{ steps.bump.outputs.new-version }}
-        path: INSTALL_INSTRUCTIONS.md
-        retention-days: 30
 
   notify:
     needs: [test, release]
@@ -248,16 +166,17 @@ jobs:
     - name: Notify on success
       if: ${{ needs.release.result == 'success' }}
       run: |
-        echo "🎉 Successfully released new version!"
+        echo "🎉 Version bump PR created successfully!"
         echo "✅ Tests passed"
-        echo "✅ Version bumped and tagged"
-        echo "✅ GitHub release created"
-        echo "✅ NPM package published (if token available)"
+        echo "✅ Version bumped in branch"
+        echo "✅ Auto-merge enabled"
+        echo "🔄 Waiting for GitHub to merge PR when checks pass"
+        echo "📋 Post-merge workflow will handle release creation"
 
     - name: Notify on failure
       if: ${{ needs.test.result == 'failure' || needs.release.result == 'failure' }}
       run: |
-        echo "❌ Release failed!"
+        echo "❌ Version bump PR creation failed!"
         echo "Test result: ${{ needs.test.result }}"
         echo "Release result: ${{ needs.release.result }}"
         exit 1
