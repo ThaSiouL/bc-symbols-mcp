@@ -3,7 +3,8 @@ import { BCApp, ObjectQuery, DependencyQuery, ReferenceQuery } from '../types/bc
 import { AppExtractor } from '../processors/app-extractor.js';
 import { SymbolParser } from '../processors/symbol-parser.js';
 import { MemoryCache } from '../cache/memory-cache.js';
-import { readFileSync, existsSync, statSync, readdirSync } from 'fs';
+import { readFileSync, existsSync } from 'fs';
+import { stat, readdir } from 'fs/promises';
 import { createHash } from 'crypto';
 import { join, extname, resolve } from 'path';
 
@@ -776,7 +777,7 @@ export class BCTools {
           sourceCount: this.configuredSources.length
         },
         discoveredFiles: {
-          total: this.discoveredFiles,
+          files: this.discoveredFiles,
           totalCount: this.discoveredFiles.length,
           loaded: categorizedFiles.loaded,
           loadedCount: categorizedFiles.loaded.length,
@@ -806,13 +807,17 @@ export class BCTools {
     const appFiles: string[] = [];
     
     for (const source of sources) {
-      const stat = statSync(source);
-      
-      if (stat.isFile() && extname(source).toLowerCase() === '.app') {
-        appFiles.push(source);
-      } else if (stat.isDirectory()) {
-        const directoryFiles = this.scanDirectory(source, recursive);
-        appFiles.push(...directoryFiles);
+      try {
+        const stats = await stat(source);
+        
+        if (stats.isFile() && extname(source).toLowerCase() === '.app') {
+          appFiles.push(source);
+        } else if (stats.isDirectory()) {
+          const directoryFiles = await this.scanDirectory(source, recursive);
+          appFiles.push(...directoryFiles);
+        }
+      } catch (error) {
+        // Silently skip sources that can't be accessed
       }
     }
     
@@ -823,21 +828,26 @@ export class BCTools {
   /**
    * Scan a directory for app files
    */
-  private scanDirectory(directory: string, recursive: boolean): string[] {
+  private async scanDirectory(directory: string, recursive: boolean): Promise<string[]> {
     const appFiles: string[] = [];
     
     try {
-      const entries = readdirSync(directory);
+      const entries = await readdir(directory);
       
       for (const entry of entries) {
         const fullPath = join(directory, entry);
-        const stat = statSync(fullPath);
         
-        if (stat.isFile() && extname(entry).toLowerCase() === '.app') {
-          appFiles.push(fullPath);
-        } else if (stat.isDirectory() && recursive) {
-          const subdirectoryFiles = this.scanDirectory(fullPath, recursive);
-          appFiles.push(...subdirectoryFiles);
+        try {
+          const stats = await stat(fullPath);
+          
+          if (stats.isFile() && extname(entry).toLowerCase() === '.app') {
+            appFiles.push(fullPath);
+          } else if (stats.isDirectory() && recursive) {
+            const subdirectoryFiles = await this.scanDirectory(fullPath, recursive);
+            appFiles.push(...subdirectoryFiles);
+          }
+        } catch (error) {
+          // Silently skip files/directories that can't be accessed
         }
       }
     } catch (error) {
