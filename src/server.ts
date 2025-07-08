@@ -29,7 +29,7 @@ class BCSymbolsServer {
     this.server = new Server(
       {
         name: 'bc-symbols-mcp',
-        version: '1.0.0',
+        version: '1.0.9',
       },
       {
         capabilities: {
@@ -165,7 +165,7 @@ class BCSymbolsServer {
   } {
     return {
       name: 'bc-symbols-mcp',
-      version: '1.0.0',
+      version: '1.0.9',
       capabilities: ['resources', 'tools'],
       cacheStats: this.cache.getStats()
     };
@@ -197,12 +197,10 @@ process.on('uncaughtException', (error) => {
   process.exit(1);
 });
 
-// Start the server if this file is run directly
-if (import.meta.url === `file://${process.argv[1]}`) {
-  main().catch((error) => {
-    console.error('Fatal error:', error);
-    process.exit(1);
-  });
-}
+// Start the server when this module is executed
+main().catch((error) => {
+  console.error('Fatal error:', error);
+  process.exit(1);
+});
 
 export { BCSymbolsServer };

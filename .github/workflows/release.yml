@@ -97,6 +97,9 @@ jobs:
         
         # Update package.json
         npm version ${{ steps.version.outputs.bump }} --no-git-tag-version
+        
+        # Update version in src/server.ts (both locations)
+        sed -i "s/version: '[^']*'/version: '${NEW_VERSION#v}'/g" src/server.ts
 
     - name: Generate changelog
       id: changelog
@@ -125,7 +128,7 @@ jobs:
       run: |
         BRANCH_NAME="release/v${{ steps.bump.outputs.new-version }}"
         git checkout -b "$BRANCH_NAME"
-        git add package.json package-lock.json
+        git add package.json package-lock.json src/server.ts
         git commit -m "chore: bump version to v${{ steps.bump.outputs.new-version }} [skip ci]"
         git push origin "$BRANCH_NAME"
         echo "branch-name=$BRANCH_NAME" >> $GITHUB_OUTPUT
