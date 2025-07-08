@@ -155,9 +155,6 @@ class BCSymbolsServer {
       // Handle shutdown signals
       process.once('SIGINT', cleanup);
       process.once('SIGTERM', cleanup);
-      
-      // Store cleanup function for manual shutdown
-      this._cleanup = cleanup;
     });
   }
 
