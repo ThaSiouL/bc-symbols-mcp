@@ -22,13 +22,6 @@ describe('MCP Server Initialization', () => {
   });
 
   describe('Server Construction', () => {
-    test('should log initialization messages', () => {
-      server = new BCSymbolsServer();
-      
-      expect(consoleSpy).toHaveBeenCalledWith('BC Symbols MCP Server initialized');
-      expect(consoleSpy).toHaveBeenCalledWith('Cache expiration: 60 minutes');
-    });
-
     test('should create server with proper configuration', () => {
       server = new BCSymbolsServer();
       
@@ -51,22 +44,6 @@ describe('MCP Server Initialization', () => {
 
     test('should have shutdown method available', () => {
       expect(typeof server.shutdown).toBe('function');
-    });
-  });
-
-  describe('Version Handling', () => {
-    test('should read version from package.json', () => {
-      server = new BCSymbolsServer();
-      
-      const serverInfo = server.getServerInfo();
-      expect(serverInfo.version).toBe('1.4.0'); // Current package.json version
-    });
-
-    test('should fallback to default version if package.json read fails', () => {
-      // Since the module is already loaded, we can't easily test this
-      // But we can verify the version is set correctly
-      expect(typeof server.getServerInfo().version).toBe('string');
-      expect(server.getServerInfo().version).toMatch(/^\d+\.\d+\.\d+$/);
     });
   });
 

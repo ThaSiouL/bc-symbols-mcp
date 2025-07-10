@@ -149,10 +149,11 @@ jobs:
     - name: Enable auto-merge for version bump PR
       run: |
         # Enable auto-merge - GitHub will handle the merge when checks pass
-        gh pr merge "${{ steps.pr.outputs.pr-url }}" --auto --squash --delete-branch
+        gh pr merge "${{ steps.pr.outputs.pr-url }}" --auto --squash
         echo "✅ Auto-merge enabled for PR: ${{ steps.pr.outputs.pr-url }}"
         echo "🔄 GitHub will automatically merge when all checks pass"
         echo "📋 The post-merge workflow will handle tagging and release creation"
+        echo "🗑️ Branch deletion will be handled by GitHub's repository settings"
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
