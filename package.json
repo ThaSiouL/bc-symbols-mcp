@@ -1,6 +1,6 @@
 {
   "name": "bc-symbols-mcp",
-  "version": "1.4.4",
+  "version": "1.4.5",
   "description": "MCP server for analyzing Business Central .app files and BC object structures",
   "type": "module",
   "main": "dist/server.js",
