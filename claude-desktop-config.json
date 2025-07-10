@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "bc-symbols-mcp": {
+      "command": "node",
+      "args": ["/home/thasioul/projects/bc-symbols-mcp/dist/server.js"],
+      "env": {
+        "NODE_ENV": "production"
+      }
+    }
+  }
+}

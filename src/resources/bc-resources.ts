@@ -101,15 +101,16 @@ export class BCResources {
    * Read app-specific resource
    */
   private async readAppResource(url: URL): Promise<string> {
+    // For bc-app:// URLs, the hostname is the app ID
+    const appId = url.hostname;
     const pathParts = url.pathname.split('/').filter(p => p);
     
     if (pathParts.length < 2) {
-      throw new Error(`Invalid app resource URI: ${url.toString()}`);
+      throw new Error(`Invalid app resource URI: ${url.toString()}. At least two path segments are required.`);
     }
 
-    const appId = pathParts[0];
-    const resourceType = pathParts[1];
-    const resourceSubType = pathParts[2];
+    const resourceType = pathParts[0];
+    const resourceSubType = pathParts[1];
 
     const app = this.cache.findAppById(appId);
     if (!app) {

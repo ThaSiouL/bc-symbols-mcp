@@ -47,7 +47,6 @@ describe('MCP Server Initialization', () => {
     });
   });
 
-
   describe('Signal Handling', () => {
     test('should have start method that handles signals', () => {
       server = new BCSymbolsServer();
