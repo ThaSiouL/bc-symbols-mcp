@@ -1,0 +1,22 @@
+{
+  "@modelcontextprotocol/sdk": {
+    "wanted": "0.5.0",
+    "latest": "1.16.0",
+    "dependent": "bc-symbols-mcp"
+  },
+  "adm-zip": {
+    "wanted": "0.5.16",
+    "latest": "0.5.16",
+    "dependent": "bc-symbols-mcp"
+  },
+  "stream-json": {
+    "wanted": "1.9.1",
+    "latest": "1.9.1",
+    "dependent": "bc-symbols-mcp"
+  },
+  "xml2js": {
+    "wanted": "0.6.2",
+    "latest": "0.6.2",
+    "dependent": "bc-symbols-mcp"
+  }
+}
